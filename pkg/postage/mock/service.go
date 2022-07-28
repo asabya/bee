@@ -5,6 +5,7 @@
 package mock
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
 	"sync"
@@ -93,7 +94,20 @@ func (m *mockPostage) HandleCreate(_ *postage.Batch) error { return nil }
 
 func (m *mockPostage) HandleTopUp(_ []byte, _ *big.Int) {}
 
-func (m *mockPostage) HandleDepthIncrease(_ []byte, _ uint8, _ *big.Int) {}
+func (m *mockPostage) HandleDepthIncrease(batchID []byte, newDepth uint8, newBalance *big.Int) {
+	m.issuerLock.Lock()
+	defer m.issuerLock.Unlock()
+
+	for k, v := range m.issuersMap {
+		if bytes.Equal(batchID, v.ID()) {
+			if newDepth > v.Depth() {
+				newStamp := postage.NewStampIssuer(v.Label(), k, v.ID(), v.Amount(), newDepth, v.BucketDepth(), v.BlockNumber(), v.ImmutableFlag())
+				m.issuersMap[k] = newStamp
+			}
+			return
+		}
+	}
+}
 
 func (m *mockPostage) Close() error {
 	return nil
